@@ -4,6 +4,7 @@ import { Config } from './config';
 
 import { create, Client, decryptMedia, ev, smartUserAgent, NotificationLanguage, MessageTypes, ChatMuteDuration } from '../src/index';
 import { CLIENT_RENEG_WINDOW } from 'tls';
+import { Console } from 'console';
 const mime = require('mime-types');
 const fs = require('fs');
 const uaOverride = 'WhatsApp/2.16.352 Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Safari/605.1.15';
@@ -135,7 +136,18 @@ async function start(client: Client) {
             }
           } else {
             // process command
-            Debug.log(Debug.ERROR, "Command handler not implemented yet");
+            switch (message.body.toLowerCase()) {
+              case "exit":
+                Debug.log(Debug.WARNING, "Exit script on user request")
+                process.exit(0);
+                break;
+              case "ping":
+                client.sendText(`${Config.remotePhoneNumber}@c.us`, `Still alive _(${new Date().toLocaleString()})_`);
+                break;
+              default:
+                Debug.log(Debug.ERROR, `Command '${message.body}' unknown`);
+            }
+            
           }
         } else {
           Debug.log(Debug.ERROR, `Cannot process message of type '${message.type} from self'`);
