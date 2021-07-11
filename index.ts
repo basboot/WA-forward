@@ -98,40 +98,78 @@ async function start(client: Client) {
     Debug.log(Debug.VERBOSE, '--- Processing new message ---')
     Debug.log(Debug.DEBUG, message);
 
-    try {
-      let txtMessage = "";
-      if (message.type == MessageTypes.TEXT) {
-        txtMessage = message.body;
-        if (message.quotedMsg != null) {
-          Debug.log(Debug.DEBUG, "THIS IS A REPLY");
+    let messageFromMe = false;
+    if (message.from == `${Config.remotePhoneNumber}@c.us`) {
+      messageFromMe = true;
+      Debug.log(Debug.DEBUG, `Message from self, relay or process command`)
+    } else {
+      Debug.log(Debug.DEBUG, "Not from remote phone, so it is a 'normal' message");
+    }
 
+    // TODO: CLEANUP
 
-          if (message.from == `${Config.remotePhoneNumber}@c.us`) {
-            let contactId = message.quotedMsg.content.split('\n')[1];
-            Debug.log(Debug.DEBUG, `Relay this message to: ${contactId}`)
+    // TODO: forward text per ongeluk weggegooid????
+
+    let txtMessage = "";
+
+    if (messageFromMe) {
+      // process message from self
+      try {
+        if (message.type == MessageTypes.TEXT) {
+          txtMessage = message.body;
+          // Received a reply to forwarderd message => Relay message to original sender
+          if (message.quotedMsg != null) {
+            // TODO: Check quotedMsg format
+            Debug.log(Debug.DEBUG, "Received a reply to forwarderd message => Relay message to original sender");
+
+            // extract sender from quote
+            let contactId = message.quotedMsg.body.split('\n')[1];
+            let contactNumber:number = parseInt(contactId.split('@')[0]);
+            let contactType = contactId.split('@')[1];
+            
+            // send message
+            if (contactType == "c.us") {
+              client.sendText(`${contactNumber}@c.us`, `${txtMessage}`);
+            } else {
+              Debug.log(Debug.ERROR, "Group sending not implemented yet");  
+            }
           } else {
-            Debug.log(Debug.DEBUG, "Not from remote phone, so it is a 'normal' message");
+            // process command
+            Debug.log(Debug.ERROR, "Command handler not implemented yet");
           }
+        } else {
+          Debug.log(Debug.ERROR, `Cannot process message of type '${message.type} from self'`);
         }
-      } else {
-        txtMessage = `Received message of type '${message.type}'`;
+      } catch (error) {
+        Debug.log(Debug.ERROR, "Problem in 'onMessage' -> error", error);
       }
-
-      if (message.type == MessageTypes.IMAGE) {
-        Debug.log(Debug.DEBUG, ">>> Send image");
-        const filename = `${message.t}.${mime.extension(message.mimetype)}`;
-
-        let mediaData = await decryptMedia(message, uaOverride);
-        await client.sendImage(`${Config.remotePhoneNumber}@c.us`,
-          `data:${message.mimetype};base64,${mediaData.toString('base64')}`,
-          filename,
-          `*${message.sender.formattedName}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
-      } else {
-        Debug.log(Debug.DEBUG, ">>> Send text");
-        client.sendText(`${Config.remotePhoneNumber}@c.us`, `*${message.sender.formattedName}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
+    } else {
+      // Message not from me => forward message to other phone
+      try {  
+        // set message text
+        if (message.type == MessageTypes.TEXT ) {
+          txtMessage = message.body;
+        } else {
+          txtMessage = `Received message of type '${message.type}'`;
+          // TODO: add caption
+        }
+        
+        if (message.type == MessageTypes.IMAGE) {
+          Debug.log(Debug.DEBUG, ">>> Send image");
+          const filename = `${message.t}.${mime.extension(message.mimetype)}`;
+  
+          let mediaData = await decryptMedia(message, uaOverride);
+          await client.sendImage(`${Config.remotePhoneNumber}@c.us`,
+            `data:${message.mimetype};base64,${mediaData.toString('base64')}`,
+            filename,
+            `*${message.sender.formattedName}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
+        } else {
+          Debug.log(Debug.DEBUG, ">>> Send text");
+          client.sendText(`${Config.remotePhoneNumber}@c.us`, `*${message.sender.formattedName}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
+        }
+      } catch (error) {
+        Debug.log(Debug.ERROR, "Problem in 'onMessage' -> error", error);
       }
-    } catch (error) {
-      Debug.log(Debug.ERROR, "Problem in 'onMessage' -> error", error);
     }
   });
 }
