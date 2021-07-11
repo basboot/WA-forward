@@ -1,7 +1,11 @@
 // const wa = require('../dist/index');
 // var create = require("@open-wa/wa-automate").create;
 // import { create, Client, decryptMedia, ev } from '../dist/index';
-import { create, Client, decryptMedia, ev, smartUserAgent, NotificationLanguage } from '../src/index';
+
+import {Config} from './config';
+
+import { create, Client, decryptMedia, ev, smartUserAgent, NotificationLanguage, MessageTypes, ChatMuteDuration } from '../src/index';
+import { CLIENT_RENEG_WINDOW } from 'tls';
 const mime = require('mime-types');
 const fs = require('fs');
 const uaOverride = 'WhatsApp/2.16.352 Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Safari/605.1.15';
@@ -37,32 +41,32 @@ ev.on('STARTUP.**', async (data,sessionId) => {
   if(data==='SUCCESS') console.log(`${sessionId} started!`)
 })
 
-/**
- * Detect all events
- */
-ev.on('**', async (data,sessionId,namespace) => {
-  console.log("\n----------")
-  console.log('EV',data,sessionId,namespace)
-  console.log("----------")
-})
+// /**
+//  * Detect all events
+//  */
+// ev.on('**', async (data,sessionId,namespace) => {
+//   console.log("\n----------")
+//   console.log('EV',data,sessionId,namespace)
+//   console.log("----------")
+// })
 
-/**
- * Detect the session data object
- */
-ev.on('sessionData.**', async (sessionData, sessionId) =>{
-  console.log("\n----------")
-  console.log('sessionData',sessionId, sessionData)
-  console.log("----------")
-})
+// /**
+//  * Detect the session data object
+//  */
+// ev.on('sessionData.**', async (sessionData, sessionId) =>{
+//   console.log("\n----------")
+//   console.log('sessionData',sessionId, sessionData)
+//   console.log("----------")
+// })
 
-/**
- * Detect the session data object encoded as a base64string
- */
-ev.on('sessionDataBase64.**', async (sessionData, sessionId) =>{
-  console.log("\n----------")
-  console.log('sessionData',sessionId, sessionData)
-  console.log("----------")
-})
+// /**
+//  * Detect the session data object encoded as a base64string
+//  */
+// ev.on('sessionDataBase64.**', async (sessionData, sessionId) =>{
+//   console.log("\n----------")
+//   console.log('sessionData',sessionId, sessionData)
+//   console.log("----------")
+// })
 
 async function start(client: Client) {
   app.use(client.middleware(true));
@@ -72,7 +76,7 @@ app.listen(PORT, function () {
 });
 
   globalClient=client;
-  console.log('starting');
+  console.log(`Starting WA-forwarder for: ${Config.remote_phone_number}`)
   const me = await client.getMe();
   console.log("start -> me", me);
   // const chats = await client.getAllChatsWithMessages(false);
@@ -110,100 +114,139 @@ app.listen(PORT, function () {
 
   client.onAnyMessage(message=>{
     console.log(message.type)
-    if(message.body==='DELETE') client.deleteMessage(message.from,message.id,false)
+    // if(message.body==='DELETE') client.deleteMessage(message.from,message.id,false)
   });
   // client.onParticipantsChanged("XXXXXXXXXX-YYYYYYYYY@g.us",x=>console.log(x))
   client.onMessage(async message => {
+    console.log("--- NEW MESSAGE ---");
+    console.log(message);
+
     try {
+      let txtMessage = "";
+      if (message.type == MessageTypes.TEXT ) {
+        txtMessage = message.body;
+        if (message.quotedMsg != null) {
+          console.log("THIS IS A REPLY");
 
-    const mp3_message_id = await client.sendAudio(message.from,'https://file-examples-com.github.io/uploads/2017/11/file_example_MP3_700KB.mp3', null)
-    console.log("start -> mp", mp3_message_id)
-
-    const isConnected = await client.isConnected();
-    console.log("TCL: start -> isConnected", isConnected)
-    console.log(message.body, message.id, message?.quotedMsgObj?.id);
-    if (message.mimetype) {
-      const filename = `${message.t}.${mime.extension(message.mimetype)}`;
-
-      // if it is a sticker, you need to run this.
-      let mediaData;
-      if( message.type==='sticker') {
-        //getStickerDecryptable is an insiders feature! 
-        let stickerDecryptable = await client.getStickerDecryptable(message.id);
-        if(stickerDecryptable) mediaData = await decryptMedia(stickerDecryptable, uaOverride);
+          
+          if (message.from == `${Config.remote_phone_number}@c.us`) {
+            let contactId = message.quotedMsg.content.split('\n')[1];
+            console.log(`Relay this message to: ${contactId}`)
+          } else {
+            console.log("Not from remote phone, so it is a 'normal' message");
+          }
+        }
       } else {
-        mediaData = await decryptMedia(message, uaOverride);
+        txtMessage = `Received message of type '${message.type}'`;
       }
-      if(message.type==='video') {
-          const mp4_as_sticker = await client.sendMp4AsSticker(message.from,mediaData);
-          console.log("start -> mp4_as_sticker", mp4_as_sticker)
-      }
-      // you can send a file also with sendImage or await client.sendFile
-      await client.sendImage(
-        message.from,
+
+      if (message.type == MessageTypes.IMAGE) {
+        console.log(">>> Send image");
+        const filename = `${message.t}.${mime.extension(message.mimetype)}`;
+
+        let mediaData = await decryptMedia(message, uaOverride);
+        await client.sendImage(`${Config.remote_phone_number}@c.us`,
         `data:${message.mimetype};base64,${mediaData.toString('base64')}`,
         filename,
-        `You just sent me this ${message.type}`
-      );
-      
-      //send the whole data URI so the mimetype can be checked.
-      await client.sendImageAsSticker(message.from, `data:${message.mimetype};base64,${mediaData.toString('base64')}`)
-      //get this numbers products
-      // const products = await client.getBusinessProfilesProducts(message.to);
-
-      // //send a product from this number to that number
-      //  await client.sendImageWithProduct(
-      //   `data:${message.mimetype};base64,${mediaData.toString('base64')}`,
-      //   message.from,
-      //   'check out this product',
-      //   message.to,
-      //   products[0].id)
-
-        // await client.forwardMessages(message.from,message,false);
-
-        await client.forwardMessages(message.from,message.id,false);
-      fs.writeFileSync(filename, mediaData, function(err) {
-        if (err) {
-          return console.log(err);
-        }
-        console.log('The file was saved!');
-      });
-
-      /**
-       * You can also send the file as a relative file reference. The library will automatically open the file and get the dataUrl
-       */
-      const message_id_from_file = await client.sendImage(message.from,
-        './'+filename,
-        filename,
-        'from file',
-        null,
-        true,
-        false
-        )
-      console.log("start -> message_id", message_id_from_file)
-
-      /**
-       * Now you can send an animated gif via url
-       */
-      const sticker_from_url_gif_id = await client.sendStickerfromUrl(message.from, "https://i.giphy.com/media/yJil9u57ybQ9movc6E/source.gif")
-      console.log("start -> sticker_from_url_gif_id", sticker_from_url_gif_id)
-
-    } else if (message.type==="location") {
-      if(message.shareDuration) console.log('This user has started sharing their live location', message.author || message.from)
-      console.log("TCL: location -> message", message.lat, message.lng, message.loc)
-      await client.sendLocation(message.from, `${message.lat}`, `${message.lng}`, `Youre are at ${message.loc}`)
-    } else {
-      // var sentMessageId = await client.sendText(message.from, message.body);
-      // console.log("start -> sentMessageId", sentMessageId)
-      // //send a giphy gif
-      //   await client.forwardMessages(message.from,message,false);
-      // await client.sendGiphy(message.from,'https://media.giphy.com/media/oYtVHSxngR3lC/giphy.gif','Oh my god it works');
-      // console.log("TCL: start -> message.from,message.body,message.id.toString()", message.from,message.body,message.id.toString())
-      // await client.reply(message.from,message.body,message);
-    }
+        `*${message.sender.formattedName}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
+      } else {
+        console.log(">>> Send text");
+        client.sendText(`${Config.remote_phone_number}@c.us`, `*${message.sender.formattedName}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
+      }
     } catch (error) {
-    console.log("TCL: start -> error", error)
+      console.log("Problem in 'onMessage' -> error", error);
     }
+
+    // try {
+
+    // const mp3_message_id = await client.sendAudio(message.from,'https://file-examples-com.github.io/uploads/2017/11/file_example_MP3_700KB.mp3', null)
+    // console.log("start -> mp", mp3_message_id)
+
+    // const isConnected = await client.isConnected();
+    // console.log("TCL: start -> isConnected", isConnected)
+    // console.log(message.body, message.id, message?.quotedMsgObj?.id);
+    // if (message.mimetype) {
+    //   const filename = `${message.t}.${mime.extension(message.mimetype)}`;
+
+    //   // if it is a sticker, you need to run this.
+    //   let mediaData;
+    //   if( message.type==='sticker') {
+    //     //getStickerDecryptable is an insiders feature! 
+    //     let stickerDecryptable = await client.getStickerDecryptable(message.id);
+    //     if(stickerDecryptable) mediaData = await decryptMedia(stickerDecryptable, uaOverride);
+    //   } else {
+    //     mediaData = await decryptMedia(message, uaOverride);
+    //   }
+    //   if(message.type==='video') {
+    //       const mp4_as_sticker = await client.sendMp4AsSticker(message.from,mediaData);
+    //       console.log("start -> mp4_as_sticker", mp4_as_sticker)
+    //   }
+    //   // you can send a file also with sendImage or await client.sendFile
+    //   await client.sendImage(
+    //     message.from,
+    //     `data:${message.mimetype};base64,${mediaData.toString('base64')}`,
+    //     filename,
+    //     `You just sent me this ${message.type}`
+    //   );
+      
+    //   //send the whole data URI so the mimetype can be checked.
+    //   await client.sendImageAsSticker(message.from, `data:${message.mimetype};base64,${mediaData.toString('base64')}`)
+    //   //get this numbers products
+    //   // const products = await client.getBusinessProfilesProducts(message.to);
+
+    //   // //send a product from this number to that number
+    //   //  await client.sendImageWithProduct(
+    //   //   `data:${message.mimetype};base64,${mediaData.toString('base64')}`,
+    //   //   message.from,
+    //   //   'check out this product',
+    //   //   message.to,
+    //   //   products[0].id)
+
+    //     // await client.forwardMessages(message.from,message,false);
+
+    //     await client.forwardMessages(message.from,message.id,false);
+    //   fs.writeFileSync(filename, mediaData, function(err) {
+    //     if (err) {
+    //       return console.log(err);
+    //     }
+    //     console.log('The file was saved!');
+    //   });
+
+    //   /**
+    //    * You can also send the file as a relative file reference. The library will automatically open the file and get the dataUrl
+    //    */
+    //   const message_id_from_file = await client.sendImage(message.from,
+    //     './'+filename,
+    //     filename,
+    //     'from file',
+    //     null,
+    //     true,
+    //     false
+    //     )
+    //   console.log("start -> message_id", message_id_from_file)
+
+    //   /**
+    //    * Now you can send an animated gif via url
+    //    */
+    //   const sticker_from_url_gif_id = await client.sendStickerfromUrl(message.from, "https://i.giphy.com/media/yJil9u57ybQ9movc6E/source.gif")
+    //   console.log("start -> sticker_from_url_gif_id", sticker_from_url_gif_id)
+
+    // } else if (message.type==="location") {
+    //   if(message.shareDuration) console.log('This user has started sharing their live location', message.author || message.from)
+    //   console.log("TCL: location -> message", message.lat, message.lng, message.loc)
+    //   await client.sendLocation(message.from, `${message.lat}`, `${message.lng}`, `Youre are at ${message.loc}`)
+    // } else {
+    //   // var sentMessageId = await client.sendText(message.from, message.body);
+    //   // console.log("start -> sentMessageId", sentMessageId)
+    //   // //send a giphy gif
+    //   //   await client.forwardMessages(message.from,message,false);
+    //   // await client.sendGiphy(message.from,'https://media.giphy.com/media/oYtVHSxngR3lC/giphy.gif','Oh my god it works');
+    //   // console.log("TCL: start -> message.from,message.body,message.id.toString()", message.from,message.body,message.id.toString())
+    //   // await client.reply(message.from,message.body,message);
+    // }
+    // } catch (error) {
+    // console.log("TCL: start -> error", error)
+    // }
   });
 
     // const groupCreationEvent = await client.createGroup('coolnewgroup','0000000000@c.us');
@@ -222,7 +265,7 @@ app.listen(PORT, function () {
  * and you can AND SHOULD override the user agent.
  */
 create({
-  sessionId:'customer-support',
+  sessionId:'WA-forwarder',
   // executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   useChrome: true,
   restartOnCrash: start,

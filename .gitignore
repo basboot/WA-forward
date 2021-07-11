@@ -1,6 +1,17 @@
 # don't send config to github
 config.ts
 
+# exclude message samples
+*.json
+
+# exclude test script
+test.ts
+
+# exclude WA temp files
+.node-persist
+logs
+*.png
+
 
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,macos,dropbox
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,macos,dropbox
