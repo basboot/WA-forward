@@ -1,4 +1,5 @@
 // Import class with configuration parameters
+import { Debug } from './debug';
 import { Config } from './config';
 
 import { create, Client, decryptMedia, ev, smartUserAgent, NotificationLanguage, MessageTypes, ChatMuteDuration } from '../src/index';
@@ -18,7 +19,7 @@ const PORT = 8082;
 
 
 ON_DEATH(async function (signal, err) {
-  console.log('killing session');
+  Debug.log(Debug.DEBUG, 'killing session');
   if (globalClient) await globalClient.kill();
 })
 
@@ -35,81 +36,81 @@ ev.on('qr.**', async (qrcode, sessionId) => {
  * Detect when a session has been started successfully
  */
 ev.on('STARTUP.**', async (data, sessionId) => {
-  if (data === 'SUCCESS') console.log(`${sessionId} started!`)
+  if (data === 'SUCCESS') Debug.log(Debug.VERBOSE, `${sessionId} started!`)
 })
 
 /**
  * Detect all events
  */
 ev.on('**', async (data,sessionId,namespace) => {
-  console.log("\n----------")
-  console.log('EV',data,sessionId,namespace)
-  console.log("----------")
+  Debug.log(Debug.INFORMATION, "\n----------")
+  Debug.log(Debug.INFORMATION, 'EV',data,sessionId,namespace)
+  Debug.log(Debug.INFORMATION, "----------")
 })
 
 /**
  * Detect the session data object
  */
 ev.on('sessionData.**', async (sessionData, sessionId) =>{
-  console.log("\n----------")
-  console.log('sessionData',sessionId, sessionData)
-  console.log("----------")
+  Debug.log(Debug.INFORMATION, "\n----------")
+  Debug.log(Debug.INFORMATION, 'sessionData',sessionId, sessionData)
+  Debug.log(Debug.INFORMATION, "----------")
 })
 
 /**
  * Detect the session data object encoded as a base64string
  */
 ev.on('sessionDataBase64.**', async (sessionData, sessionId) =>{
-  console.log("\n----------")
-  console.log('sessionData',sessionId, sessionData)
-  console.log("----------")
+  Debug.log(Debug.INFORMATION, "\n----------")
+  Debug.log(Debug.INFORMATION, 'sessionData',sessionId, sessionData)
+  Debug.log(Debug.INFORMATION, "----------")
 })
 
 async function start(client: Client) {
   app.use(client.middleware(true));
 
   app.listen(PORT, function () {
-    console.log(`\n• Listening on port ${PORT}!`);
+    Debug.log(Debug.VERBOSE, `\n• Listening on port ${PORT}!`);
   });
 
   globalClient = client;
-  console.log(`Starting WA-forwarder for: ${Config.remotePhoneNumber}`)
+  Debug.log(Debug.VERBOSE, `Starting WA-forwarder for: ${Config.remotePhoneNumber}`)
   const me = await client.getMe();
-  console.log("start -> me", me);
+  Debug.log(Debug.INFORMATION, "start -> me", me);
 
-  client.onAck((c: any) => console.log(c.id, c.body, c.ack));
-  client.onAddedToGroup(newGroup => console.log('Added to new Group', newGroup.id));
-  client.onIncomingCall(call => console.log('newcall', call));
+  client.onAck((c: any) => Debug.log(Debug.VERBOSE, c.id, c.body, c.ack));
+  client.onAddedToGroup(newGroup => Debug.log(Debug.VERBOSE, 'Added to new Group', newGroup.id));
+  client.onIncomingCall(call => Debug.log(Debug.VERBOSE, 'newcall', call));
 
   const prods = await client.getBusinessProfilesProducts(me.wid)
-  console.log(prods)
+  Debug.log(Debug.VERBOSE, prods)
 
   client.onStateChanged(state => {
-    console.log('statechanged', state)
+    Debug.log(Debug.VERBOSE, 'statechanged', state)
     if (state === "CONFLICT" || state === "UNLAUNCHED") client.forceRefocus();
   });
 
   client.onAnyMessage(message => {
-    console.log(message.type)
+    Debug.log(Debug.VERBOSE, 'Message detected of type: ', message.type)
   });
 
   client.onMessage(async message => {
-    console.log("--- NEW MESSAGE ---");
-    console.log(message);
+    Debug.log(Debug.VERBOSE, '--- Processing new message ---')
+    Debug.log(Debug.DEBUG, message);
 
     try {
       let txtMessage = "";
       if (message.type == MessageTypes.TEXT) {
         txtMessage = message.body;
         if (message.quotedMsg != null) {
-          console.log("THIS IS A REPLY");
+          Debug.log(Debug.DEBUG, "THIS IS A REPLY");
 
 
           if (message.from == `${Config.remotePhoneNumber}@c.us`) {
             let contactId = message.quotedMsg.content.split('\n')[1];
-            console.log(`Relay this message to: ${contactId}`)
+            Debug.log(Debug.DEBUG, `Relay this message to: ${contactId}`)
           } else {
-            console.log("Not from remote phone, so it is a 'normal' message");
+            Debug.log(Debug.DEBUG, "Not from remote phone, so it is a 'normal' message");
           }
         }
       } else {
@@ -117,7 +118,7 @@ async function start(client: Client) {
       }
 
       if (message.type == MessageTypes.IMAGE) {
-        console.log(">>> Send image");
+        Debug.log(Debug.DEBUG, ">>> Send image");
         const filename = `${message.t}.${mime.extension(message.mimetype)}`;
 
         let mediaData = await decryptMedia(message, uaOverride);
@@ -126,11 +127,11 @@ async function start(client: Client) {
           filename,
           `*${message.sender.formattedName}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
       } else {
-        console.log(">>> Send text");
+        Debug.log(Debug.DEBUG, ">>> Send text");
         client.sendText(`${Config.remotePhoneNumber}@c.us`, `*${message.sender.formattedName}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
       }
     } catch (error) {
-      console.log("Problem in 'onMessage' -> error", error);
+      Debug.log(Debug.ERROR, "Problem in 'onMessage' -> error", error);
     }
   });
 }
@@ -178,7 +179,7 @@ create({
   // create()
   .then(async client => await start(client))
   .catch(e => {
-    console.log('Error', e.message);
+    Debug.log(Debug.ERROR, 'Error', e.message);
     // process.exit();
   });
 
