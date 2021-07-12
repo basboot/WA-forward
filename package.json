@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@open-wa/wa-automate": "file:wa-automate-nodejs"
+  }
+}

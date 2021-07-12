@@ -2,7 +2,7 @@
 import { Debug } from './debug';
 import { Config } from './config';
 
-import { create, Client, decryptMedia, ev, smartUserAgent, NotificationLanguage, MessageTypes, ChatMuteDuration } from '../src/index';
+import { create, Client, decryptMedia, ev, smartUserAgent, NotificationLanguage, MessageTypes, ChatMuteDuration } from './wa-automate-nodejs/src/index';
 import { CLIENT_RENEG_WINDOW } from 'tls';
 import { Console } from 'console';
 const mime = require('mime-types');
