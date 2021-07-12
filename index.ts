@@ -205,12 +205,16 @@ async function start(client: Client) {
           txtMessage = message.body;
         } else {
           txtMessage = `Received message of type '${message.type}'`;
-          // TODO: add caption
+          // TODO: add caption for other types?
         }
 
         if (ForwarderState.forward) {
           if (message.type == MessageTypes.IMAGE) {
             Debug.log(Debug.DEBUG, ">>> Send image");
+            // Put caption instead of type-image if available 
+            if ("caption" in message) {
+              txtMessage = message.caption;
+            }
             const filename = `${message.t}.${mime.extension(message.mimetype)}`;
     
             let mediaData = await decryptMedia(message, uaOverride);
@@ -233,6 +237,7 @@ async function start(client: Client) {
   });
 }
 
+// TODO: Fix this, it is not working
 // Begin reading from stdin so the process does not exit.
 process.stdin.resume();
 process.on('SIGINT', function() {
