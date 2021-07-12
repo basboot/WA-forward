@@ -8,11 +8,13 @@ test.ts
 .node-persist
 logs
 *.png
+package-lock.json
 
 # managed by open-wa
 **.data.json
 **.node-persist**
 # end managed by open-wa
+
 
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,macos,dropbox
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,macos,dropbox
