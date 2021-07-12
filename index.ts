@@ -84,6 +84,7 @@ async function start(client: Client) {
   });
 
   globalClient = client;
+
   Debug.log(Debug.VERBOSE, `Starting WA-forwarder for: ${Config.remotePhoneNumber}`)
   const me = await client.getMe();
   Debug.log(Debug.INFORMATION, "start -> me", me);
@@ -226,10 +227,26 @@ async function start(client: Client) {
         }
       } catch (error) {
         Debug.log(Debug.ERROR, "Problem in 'onMessage' -> error", error);
+        client.sendText(`${Config.remotePhoneNumber}@c.us`, "_Problem in forwarder:\n${error.message}_");
       }
     }
   });
 }
+
+// Begin reading from stdin so the process does not exit.
+process.stdin.resume();
+process.on('SIGINT', function() {
+  Debug.log(Debug.VERBOSE, "WA-Forwarder interrupted by user")
+  if (globalClient !== undefined) {
+    async () => {
+      await globalClient.sendText(`${Config.remotePhoneNumber}@c.us`, "*Forwarder interrupted by user*");
+      process.exit();
+    }
+  } else {
+    process.exit();
+  }
+  
+});
 
 /**
  * it can be null, which will default to 'session' folder.
@@ -276,4 +293,9 @@ create({
   .catch(e => {
     Debug.log(Debug.ERROR, 'Error', e.message);
     // process.exit();
+    if (globalClient !== undefined) {
+      async () => await globalClient.sendText(`${Config.remotePhoneNumber}@c.us`, "*Forwarder crashed*\n${e.message}");
+    }
   });
+
+    
