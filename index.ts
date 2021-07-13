@@ -195,7 +195,38 @@ async function start(client: Client) {
             
           }
         } else {
-          Debug.log(Debug.ERROR, `Cannot process message of type '${message.type} from self'`);
+          if (message.type == MessageTypes.CONTACT_CARD) {
+            Debug.log(Debug.DEBUG, "Received a VCARD");
+
+            // Vcard version 3.0 syntax
+            // PROPERTY[;PARAMETER]:attribute[;attribute]
+            Debug.log(Debug.DEBUG, message.content);
+            let lines = message.content.split('\n');
+            let name = "Name not found";
+            let contactNumber = -1;
+            for (let line of lines) {
+              // split into property+param and attribute
+              let vcInfo = line.split(':');
+              // use formatted name as name 
+              if (vcInfo[0] == "FN") {
+                name = vcInfo[1];
+              }
+
+              // split into property and param
+              let vcProperty = vcInfo[0].split(';');
+              // just use first phone number (for now)
+              if (vcProperty[0] == "item1.TEL") {
+                // remove + sign before, and space inbetween digits to convert to number
+                Debug.log(Debug.DEBUG, `TEL found, extra number from: ${vcInfo[1]}`);
+                contactNumber = parseInt(vcInfo[1].replace('+','').replace(/\s/g, ''));
+              }
+            }
+            Debug.log(Debug.DEBUG, `Send vCard for ${name} (${contactNumber})`);
+            client.sendText(`${Config.remotePhoneNumber}@c.us`, `*vCard:* ${name}\n${contactNumber}@c.us`);
+            
+          } else {
+            Debug.log(Debug.ERROR, `Cannot process message of type '${message.type} from self'`);
+          }
         }
       } catch (error) {
         Debug.log(Debug.ERROR, "Problem in 'onMessage' -> error", error);
