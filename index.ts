@@ -272,10 +272,15 @@ async function start(client: Client) {
         // add quoted message if the message is a reply
         if (message.quotedMsg != null) {
           // also add writer of the quoted message for group messages
-          if (message.isGroupMsg) {
-            txtMessage = `${txtMessage} _(${formatSenderName(message.quotedMsg.sender)}: "${message.quotedMsg.body}")_`
+          if (message.quotedMsg.type == MessageTypes.TEXT) {
+            if (message.isGroupMsg) {
+              txtMessage = `${txtMessage} _(${formatSenderName(message.quotedMsg.sender)}: "${message.quotedMsg.body.replace(/\*|\_/gi,'')}")_`
+            } else {
+              txtMessage = `${txtMessage} _("${message.quotedMsg.body.replace(/\*|\_/gi,'')}")_`;
+            }
           } else {
-            txtMessage = `${txtMessage} _("${message.quotedMsg.body}")_`;
+            // if quoted message is not text, just include the type
+            txtMessage = `${txtMessage} _("[${message.quotedMsg.type}]")_`;
           }
         }
         
