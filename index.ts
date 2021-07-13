@@ -146,9 +146,14 @@ async function start(client: Client) {
               Debug.log(Debug.VERBOSE, `Relaying message to ${contactId}`);
               // send message
               if (contactType == "c.us") {
+                Debug.log(Debug.DEBUG, "Relay to CONTACT");
                 client.sendText(`${contactNumber}@c.us`, `${txtMessage}`);
               } else {
-                Debug.log(Debug.ERROR, "Group sending not implemented yet");  
+                Debug.log(Debug.DEBUG, "Relay to GROUP");
+                let groupAndContact = contactId.split('@')[0].split('-');
+                contactNumber = parseInt(groupAndContact[0]);
+                let groupNUmber:number = parseInt(groupAndContact[1])
+                client.sendText(`${contactNumber}-${groupNUmber}@g.us`, `${txtMessage}`);
               }
             } else {
               Debug.log(Debug.VERBOSE, `Received relaying message for ${contactId}, but relaying is disabled`);
