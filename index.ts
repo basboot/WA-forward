@@ -76,6 +76,25 @@ ev.on('sessionDataBase64.**', async (sessionData, sessionId) =>{
   Debug.log(Debug.INFORMATION, "----------")
 })
 
+/**
+ * Format the name of the sender
+ * 
+ * @param sender sender object (from message or quotedMsgObj)
+ * @returns formatted name and possible the pushname 
+ */
+function formatSenderName(sender) {
+  // Set message sender
+  let senderMessage = sender.formattedName;
+  // When sender is not in contacts the formatted name is the phone number.
+  // In this case we will append their own chosen pushname to make it easier
+  // to identify.
+  if (senderMessage.substr(0,1) == "+") {
+    senderMessage = `${sender.pushname}(${sender.formattedName})`
+  }
+
+  return senderMessage;
+}
+
 async function start(client: Client) {
   app.use(client.middleware(true));
 
@@ -242,25 +261,30 @@ async function start(client: Client) {
           txtMessage = message.body;
         } else {
           txtMessage = `Received message of type '${message.type}'`;
+        }
+        if (message.type == MessageTypes.IMAGE) {
           // TODO: add caption for other types?
+          // Put caption instead of type-image if available 
+          if ("caption" in message) {
+            txtMessage = message.caption;
+          }
         }
-
+        // add quoted message if the message is a reply
+        if (message.quotedMsg != null) {
+          // also add writer of the quoted message for group messages
+          if (message.isGroupMsg) {
+            txtMessage = `${txtMessage} _(${formatSenderName(message.quotedMsg.sender)}: "${message.quotedMsg.body}")_`
+          } else {
+            txtMessage = `${txtMessage} _("${message.quotedMsg.body}")_`;
+          }
+        }
+        
         // Set message sender
-        senderMessage = message.sender.formattedName;
-        // When sender is not in contacts the formatted name is the phone number.
-        // In this case we will append their own chosen pushname to make it easier
-        // to identify.
-        if (senderMessage.substr(0,1) == "+") {
-          senderMessage = `${message.sender.pushname}(${message.sender.formattedName})`
-        }
+        senderMessage = formatSenderName(message.sender);
 
         if (ForwarderState.forward) {
           if (message.type == MessageTypes.IMAGE) {
             Debug.log(Debug.DEBUG, ">>> Send image");
-            // Put caption instead of type-image if available 
-            if ("caption" in message) {
-              txtMessage = message.caption;
-            }
             const filename = `${message.t}.${mime.extension(message.mimetype)}`;
     
             let mediaData = await decryptMedia(message, uaOverride);
