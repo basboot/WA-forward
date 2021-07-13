@@ -125,6 +125,7 @@ async function start(client: Client) {
     // TODO: forward text per ongeluk weggegooid????
 
     let txtMessage = "";
+    let senderMessage = "";
 
     if (messageFromMe) {
       // process message from self
@@ -208,6 +209,15 @@ async function start(client: Client) {
           // TODO: add caption for other types?
         }
 
+        // Set message sender
+        senderMessage = message.sender.formattedName;
+        // When sender is not in contacts the formatted name is the phone number.
+        // In this case we will append their own chosen pushname to make it easier
+        // to identify.
+        if (senderMessage.substr(0,1) == "+") {
+          senderMessage = `${message.sender.pushname}(${message.sender.formattedName})`
+        }
+
         if (ForwarderState.forward) {
           if (message.type == MessageTypes.IMAGE) {
             Debug.log(Debug.DEBUG, ">>> Send image");
@@ -221,13 +231,13 @@ async function start(client: Client) {
             await client.sendImage(`${Config.remotePhoneNumber}@c.us`,
               `data:${message.mimetype};base64,${mediaData.toString('base64')}`,
               filename,
-              `*${message.sender.formattedName}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
+              `*${senderMessage}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
           } else {
             Debug.log(Debug.DEBUG, ">>> Send text");
-            client.sendText(`${Config.remotePhoneNumber}@c.us`, `*${message.sender.formattedName}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
+            client.sendText(`${Config.remotePhoneNumber}@c.us`, `*${senderMessage}:* ${txtMessage} (${message.chat.formattedTitle})\n${message.from}`);
           }
         } else {
-          Debug.log(Debug.VERBOSE, `Received message '${txtMessage}' from ${message.sender.formattedName}, but forwarding is disabled`);
+          Debug.log(Debug.VERBOSE, `Received message '${txtMessage}' from ${senderMessage}, but forwarding is disabled`);
         }
       } catch (error) {
         Debug.log(Debug.ERROR, "Problem in 'onMessage' -> error", error);
