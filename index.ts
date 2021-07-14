@@ -89,7 +89,7 @@ function formatSenderName(sender) {
   // In this case we will append their own chosen pushname to make it easier
   // to identify.
   if (senderMessage.substr(0,1) == "+") {
-    senderMessage = `${sender.pushname}(${sender.formattedName})`
+    senderMessage = `${sender.pushname} (${sender.formattedName})`
   }
 
   return senderMessage;
