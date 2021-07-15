@@ -125,6 +125,10 @@ async function start(client: Client) {
 
   client.onAnyMessage(message => {
     Debug.log(Debug.VERBOSE, 'Message detected of type: ', message.type)
+    if (message.fromMe) {
+      Debug.log(Debug.DEBUG, ">>> MESSAGE.FROMME == TRUE\n", message);
+      
+    }
   });
 
   client.onMessage(async message => {
@@ -337,7 +341,7 @@ create({
   sessionId: 'WA-forwarder',
   useChrome: true,
   restartOnCrash: start,
-  headless: false,
+  headless: true,
   throwErrorOnTosBlock: true,
   qrTimeout: 0,   //set to 0 to wait forever for a qr scan
   authTimeout: 0, //set to 0 to wait forever for connection to phone
