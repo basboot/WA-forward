@@ -22,7 +22,7 @@ const PORT = 8082;
 // forward: forward incoming messages to remote phone
 // relay  : relay incoming messages from the remote phone to the original sender
 // test   : in test mode , messages from remote phone are also forwarded (back to remote phone)
-let ForwarderState = {"forward" : true, "relay": true, "test": true};
+let ForwarderState = {"forward" : false, "relay": false, "test": false};
 
 function formattedForwarderState() {
   return`F: ${ForwarderState.forward}, R: ${ForwarderState.relay}, T: ${ForwarderState.test}`;
@@ -125,10 +125,6 @@ async function start(client: Client) {
 
   client.onAnyMessage(message => {
     Debug.log(Debug.VERBOSE, 'Message detected of type: ', message.type)
-    if (message.fromMe) {
-      Debug.log(Debug.DEBUG, ">>> MESSAGE.FROMME == TRUE\n", message);
-      
-    }
   });
 
   client.onMessage(async message => {
