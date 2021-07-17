@@ -11,12 +11,6 @@ const uaOverride = 'WhatsApp/2.16.352 Mozilla/5.0 (Macintosh; Intel Mac OS X 10_
 const tosBlockGuaranteed = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/79.0.3945.88 Safari/537.36";
 const ON_DEATH = require('death');
 let globalClient: Client;
-const express = require('express')
-
-const app = express()
-app.use(express.json({ limit: '200mb' })) //add the limit option so we can send base64 data through the api
-
-const PORT = 8082;
 
 // Operatiuon mode of the bot
 // forward: forward incoming messages to remote phone
@@ -96,12 +90,6 @@ function formatSenderName(sender) {
 }
 
 async function start(client: Client) {
-  app.use(client.middleware(true));
-
-  app.listen(PORT, function () {
-    Debug.log(Debug.VERBOSE, `\n• Listening on port ${PORT}!`);
-  });
-
   globalClient = client;
 
   Debug.log(Debug.VERBOSE, `Starting WA-forwarder for: ${Config.remotePhoneNumber}`)
