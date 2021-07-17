@@ -12,11 +12,14 @@ const tosBlockGuaranteed = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (
 const ON_DEATH = require('death');
 let globalClient: Client;
 
-// Operatiuon mode of the bot
+// Operation mode of the bot (set defaults here)
 // forward: forward incoming messages to remote phone
 // relay  : relay incoming messages from the remote phone to the original sender
 // test   : in test mode , messages from remote phone are also forwarded (back to remote phone)
 let ForwarderState = {"forward" : false, "relay": false, "test": false};
+
+// delay reconnection of client to allow using web whatsapp somewhere else for a certain period
+const RECONNECT_DELAY = 10 * 60 * 1000; // ms
 
 function formattedForwarderState() {
   return`F: ${ForwarderState.forward}, R: ${ForwarderState.relay}, T: ${ForwarderState.test}`;
@@ -108,7 +111,15 @@ async function start(client: Client) {
 
   client.onStateChanged(state => {
     Debug.log(Debug.VERBOSE, 'statechanged', state)
-    if (state === "CONFLICT" || state === "UNLAUNCHED") client.forceRefocus();
+    if (state === "CONFLICT" || state === "UNLAUNCHED") {
+      Debug.log(Debug.VERBOSE, `Client lost session, will try to reconnect in ${RECONNECT_DELAY/1000} seconds`);
+      setTimeout(async () => {
+        Debug.log(Debug.VERBOSE, "Trying to freconnect client now")
+        await client.forceRefocus();
+      }, RECONNECT_DELAY);
+
+      
+    }
   });
 
   client.onAnyMessage(message => {
