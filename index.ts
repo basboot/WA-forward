@@ -21,9 +21,17 @@ let ForwarderState = {"forward" : false, "relay": false, "test": false};
 // delay reconnection of client to allow using web whatsapp somewhere else for a certain period
 const RECONNECT_DELAY = 10 * 60 * 1000; // ms
 
-function formattedForwarderState() {
-  return`F: ${ForwarderState.forward}, R: ${ForwarderState.relay}, T: ${ForwarderState.test}`;
+function sendForwarderState(client:Client, message: string) {
+  // create buttons with current state
+  let buttons = [
+    {id:`F${ForwarderState.forward}`, text:`forward ${ForwarderState.forward ? "on" : "off"}`},
+    {id:`R${ForwarderState.relay}`, text:`relay ${ForwarderState.relay ? "on" : "off"}`},
+    {id:`T${ForwarderState.test}`, text:`test ${ForwarderState.test ? "on" : "off"}`},
+  ]
+
+  client.sendButtons(`${Config.remotePhoneNumber}@c.us`, message, buttons, "Forwarder state");
 }
+
 
 ON_DEATH(async function (signal, err) {
   Debug.log(Debug.DEBUG, 'killing session');
@@ -100,7 +108,7 @@ async function start(client: Client) {
   Debug.log(Debug.INFORMATION, "start -> me", me);
 
   // inform remote phone the script is active
-  client.sendText(`${Config.remotePhoneNumber}@c.us`, `*Forwarder started*\n${formattedForwarderState()}`);
+  sendForwarderState(client, "Started");
 
   client.onAck((c: any) => Debug.log(Debug.VERBOSE, c.id, c.body, c.ack));
   client.onAddedToGroup(newGroup => Debug.log(Debug.VERBOSE, 'Added to new Group', newGroup.id));
@@ -190,19 +198,23 @@ async function start(client: Client) {
                 process.exit(0);
                 break;
               case "ping":
-                commandResponse = `${formattedForwarderState()} _(still alive)_`;
+                sendForwarderState(client, "Still alive");
+                return;
                 break;
               case "forward":
                 ForwarderState.forward = param;
-                commandResponse = `${formattedForwarderState()}`;
+                sendForwarderState(client, "Ready");
+                return;
                 break;
               case "relay":
                 ForwarderState.relay = param;
-                commandResponse = `${formattedForwarderState()}`;
+                sendForwarderState(client, "Ready");
+                return;
                 break;
               case "test":
                 ForwarderState.test = param;
-                commandResponse = `${formattedForwarderState()}`;
+                sendForwarderState(client, "Ready");
+                return;
                 break;
               default:
                 Debug.log(Debug.ERROR, `Command '${message.body}' unknown`);
@@ -241,9 +253,41 @@ async function start(client: Client) {
             }
             Debug.log(Debug.DEBUG, `Send vCard for ${name} (${contactNumber})`);
             client.sendText(`${Config.remotePhoneNumber}@c.us`, `*vCard:* ${name}\n${contactNumber}@c.us`);
-            
           } else {
-            Debug.log(Debug.ERROR, `Cannot process message of type '${message.type} from self'`);
+            if (message.type == MessageTypes.BUTTONS_RESPONSE) {
+              Debug.log(Debug.DEBUG, "Buttons response received");
+
+              // TODO: cleanup and merge with chat command handling
+
+              // split message into command and parameter
+              let command = message.body.toLowerCase().split(' ')[0];
+              // Note that this is reversed because the buttons are used for toggling
+              let param = message.body.toLowerCase().split(' ')[1] == "off"; // only true and false
+              let commandResponse = "No response set";
+              // process command
+              switch (command) {
+                case "forward":
+                  ForwarderState.forward = param;
+                  sendForwarderState(client, "Ready");
+                  return;
+                  break;
+                case "relay":
+                  ForwarderState.relay = param;
+                  sendForwarderState(client, "Ready");
+                  return;
+                  break;
+                case "test":
+                  ForwarderState.test = param;
+                  sendForwarderState(client, "Ready");
+                  return;
+                  break;
+                default:
+                  Debug.log(Debug.ERROR, `Button command '${message.body}' unknown`);
+                  commandResponse = `Button command '${message.body}' unknown`;
+              }
+            } else {
+              Debug.log(Debug.ERROR, `Cannot process message of type '${message.type} from self'`);
+            }
           }
         }
       } catch (error) {
