@@ -1,3 +1,3 @@
 [submodule "wa-automate-nodejs"]
 	path = wa-automate-nodejs
-	url = git@github.com:open-wa/wa-automate-nodejs.git
+	url = git@github.com:basboot/wa-automate-nodejs.git
