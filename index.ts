@@ -100,7 +100,7 @@ function formatSenderName(sender) {
   return senderMessage;
 }
 
-async function start(client: Client) {
+export async function start(client: Client) {
   globalClient = client;
 
   Debug.log(Debug.VERBOSE, `Starting WA-forwarder for: ${Config.remotePhoneNumber}`)
@@ -376,41 +376,7 @@ process.on('SIGINT', function() {
  * You can also override some puppeteer configs, set an executable path for your instance of chrome for ffmpeg (video+GIF) support
  * and you can AND SHOULD override the user agent.
  */
-create({
-  sessionId: 'WA-forwarder',
-  useChrome: true,
-  restartOnCrash: start,
-  headless: true,
-  throwErrorOnTosBlock: true,
-  qrTimeout: 0,   //set to 0 to wait forever for a qr scan
-  authTimeout: 0, //set to 0 to wait forever for connection to phone
-  killProcessOnBrowserClose: true,
-  autoRefresh: true, //default to true
-  safeMode: true,
-  disableSpins: true,
-  hostNotificationLang: NotificationLanguage.PTBR,
-  viewport: {
-    // width: 1920,
-    height: 1200
-  },
-  popup: 3012,
-  defaultViewport: null,
-  // cacheEnabled:false,
-  // devtools:true,
-  //OR
-  // devtools:{
-  //   user:'admin',
-  //   pass:'root'
-  // },
-  //example chrome args. THIS MAY BREAK YOUR APP !!!ONLY FOR TESTING FOR NOW!!!.
-  // chromiumArgs:[
-  //   '--aggressive-cache-discard',
-  //   '--disable-cache',
-  //   '--disable-application-cache',
-  //   '--disable-offline-load-stale-cache',
-  //   '--disk-cache-size=0'
-  // ]
-})
+create(Config.clientConfig)
   // create()
   .then(async client => await start(client))
   .catch(e => {
