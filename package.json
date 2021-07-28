@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "@open-wa/wa-automate": "file:wa-automate-nodejs"
+    "@open-wa/wa-automate": "file:wa-automate-nodejs",
+    "node-schedule": "^2.0.0"
   }
 }

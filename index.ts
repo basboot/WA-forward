@@ -12,6 +12,8 @@ const tosBlockGuaranteed = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (
 const ON_DEATH = require('death');
 let globalClient: Client;
 
+const schedule = require('node-schedule');
+
 // Operation mode of the bot (set defaults here)
 // forward: forward incoming messages to remote phone
 // relay  : relay incoming messages from the remote phone to the original sender
@@ -107,12 +109,20 @@ export async function start(client: Client) {
   const me = await client.getMe();
   Debug.log(Debug.INFORMATION, "start -> me", me);
 
+  // Schedule daily message at 12:00 to inform the forwarder is running
+  const job = schedule.scheduleJob('0 0 12 * * *', function(){
+    Debug.log(Debug.VERBOSE, `Still alive. Sending notification.`);
+    sendForwarderState(client, "Still alive");
+  });
+
   // inform remote phone the script is active
   sendForwarderState(client, "Started");
 
   client.onAck((c: any) => Debug.log(Debug.VERBOSE, c.id, c.body, c.ack));
   client.onAddedToGroup(newGroup => Debug.log(Debug.VERBOSE, 'Added to new Group', newGroup.id));
   client.onIncomingCall(call => Debug.log(Debug.VERBOSE, 'newcall', call));
+
+
 
   const prods = await client.getBusinessProfilesProducts(me.wid)
   Debug.log(Debug.VERBOSE, prods)
@@ -122,7 +132,7 @@ export async function start(client: Client) {
     if (state === "CONFLICT" || state === "UNLAUNCHED") {
       Debug.log(Debug.VERBOSE, `Client lost session, will try to reconnect in ${RECONNECT_DELAY/1000} seconds`);
       setTimeout(async () => {
-        Debug.log(Debug.VERBOSE, "Trying to freconnect client now")
+        Debug.log(Debug.VERBOSE, "Trying to reconnect client now")
         await client.forceRefocus();
       }, RECONNECT_DELAY);
 
