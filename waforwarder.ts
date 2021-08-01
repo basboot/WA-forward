@@ -321,7 +321,7 @@ export class WAForwarder {
         Debug.log(Debug.INFORMATION, "start -> me", me);
 
         // Schedule daily message at 12:00 to inform the forwarder is running
-        const job = schedule.scheduleJob('0 0 12 * * *', function () {
+        const job = schedule.scheduleJob('0 0 12 * * *', () => {
             Debug.log(Debug.VERBOSE, `Still alive. Sending notification.`);
             this.sendForwarderState("Still alive");
         });
