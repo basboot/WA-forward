@@ -5,8 +5,9 @@
  * back to the original sender
  */
 
-// Import class with configuration parameters
+// Debug logging
 import { Debug } from './debug';
+// Import class with configuration parameters
 import { Config } from './config';
 
 // Import external packages for WA-automate and scheduling
@@ -31,6 +32,10 @@ export class WAForwarder {
     // test   : in test mode , messages from remote phone are also forwarded (back to remote phone)
     private ForwarderState = { "forward": false, "relay": false, "test": false };
 
+    /**
+     * 
+     * @param client WA-automate client
+     */
     public constructor(client: Client) {
         // save for external use
         WAForwarder.globalClient = client;
@@ -76,6 +81,11 @@ export class WAForwarder {
         this.client.sendButtons(`${Config.remotePhoneNumber}@c.us`, message, buttons, "Forwarder state");
     }
 
+    /**
+     * Check state for disconnection and reconnect if needed
+     * 
+     * @param state 
+     */
     private handleStateChange(state) {
         Debug.log(Debug.VERBOSE, 'statechanged', state)
         if (state === "CONFLICT" || state === "UNLAUNCHED") {
@@ -87,152 +97,154 @@ export class WAForwarder {
         }
     }
 
-    private async handleMessageFromRemotePhone(message) {
-        let txtMessage = "";
-        let senderMessage = "";
+    /**
+     * Process vcard (from remotre phone) by sending a 'fake' message to reply on
+     * 
+     * @param message 
+     */
+    private async processVcard(message) {
+        Debug.log(Debug.DEBUG, "Received a VCARD");
 
-
-        // process message from self
-        try {
-            if (message.type == MessageTypes.TEXT) {
-                txtMessage = message.body;
-                // Received a reply to forwarderd message => Relay message to original sender
-                if (message.quotedMsg != null) {
-                    // TODO: Check quotedMsg format
-                    Debug.log(Debug.DEBUG, "Received a reply to forwarded message => Relay message to original sender");
-
-                    // extract sender from quote
-                    let contactId = message.quotedMsg.body.split('\n')[1];
-                    let contactNumber: number = parseInt(contactId.split('@')[0]);
-                    let contactType = contactId.split('@')[1];
-
-                    if (this.ForwarderState.relay) {
-                        Debug.log(Debug.VERBOSE, `Relaying message to ${contactId}`);
-                        // send message
-                        if (contactType == "c.us") {
-                            Debug.log(Debug.DEBUG, "Relay to CONTACT");
-                            this.client.sendText(`${contactNumber}@c.us`, `${txtMessage}`);
-                        } else {
-                            Debug.log(Debug.DEBUG, "Relay to GROUP");
-                            let groupAndContact = contactId.split('@')[0].split('-');
-                            contactNumber = parseInt(groupAndContact[0]);
-                            let groupNUmber: number = parseInt(groupAndContact[1])
-                            this.client.sendText(`${contactNumber}-${groupNUmber}@g.us`, `${txtMessage}`);
-                        }
-                    } else {
-                        Debug.log(Debug.VERBOSE, `Received relaying message for ${contactId}, but relaying is disabled`);
-                    }
-                } else {
-                    // split message into command and parameter
-                    let command = message.body.toLowerCase().split(' ')[0];
-                    let param = message.body.toLowerCase().split(' ')[1] == "1"; // only true and false
-                    let commandResponse = "No response set";
-                    // process command
-                    switch (command) {
-                        case "exit":
-                            Debug.log(Debug.WARNING, "Exit script on user request")
-                            // TODO: also send this message on user interrupt
-                            await this.client.sendText(`${Config.remotePhoneNumber}@c.us`, "*Forwarder exited*");
-                            process.exit(0);
-                            break;
-                        case "ping":
-                            this.sendForwarderState("Still alive");
-                            return;
-                            break;
-                        case "forward":
-                            this.ForwarderState.forward = param;
-                            this.sendForwarderState("Ready");
-                            return;
-                            break;
-                        case "relay":
-                            this.ForwarderState.relay = param;
-                            this.sendForwarderState("Ready");
-                            return;
-                            break;
-                        case "test":
-                            this.ForwarderState.test = param;
-                            this.sendForwarderState("Ready");
-                            return;
-                            break;
-                        default:
-                            Debug.log(Debug.ERROR, `Command '${message.body}' unknown`);
-                            commandResponse = `Command '${message.body}' unknown`;
-                    }
-                    // send response to remote phone
-                    this.client.sendText(`${Config.remotePhoneNumber}@c.us`, commandResponse);
-
-                }
-            } else {
-                if (message.type == MessageTypes.CONTACT_CARD) {
-                    Debug.log(Debug.DEBUG, "Received a VCARD");
-
-                    // Vcard version 3.0 syntax
-                    // PROPERTY[;PARAMETER]:attribute[;attribute]
-                    Debug.log(Debug.DEBUG, message.content);
-                    let lines = message.content.split('\n');
-                    let name = "Name not found";
-                    let contactNumber = -1;
-                    for (let line of lines) {
-                        // split into property+param and attribute
-                        let vcInfo = line.split(':');
-                        // use formatted name as name 
-                        if (vcInfo[0] == "FN") {
-                            name = vcInfo[1];
-                        }
-
-                        // split into property and param
-                        let vcProperty = vcInfo[0].split(';');
-                        // just use first phone number (for now)
-                        if (vcProperty[0] == "item1.TEL") {
-                            // remove + sign before, and space inbetween digits to convert to number
-                            Debug.log(Debug.DEBUG, `TEL found, extra number from: ${vcInfo[1]}`);
-                            contactNumber = parseInt(vcInfo[1].replace('+', '').replace(/\s/g, ''));
-                        }
-                    }
-                    Debug.log(Debug.DEBUG, `Send vCard for ${name} (${contactNumber})`);
-                    this.client.sendText(`${Config.remotePhoneNumber}@c.us`, `*vCard:* ${name}\n${contactNumber}@c.us`);
-                } else {
-                    if (message.type == MessageTypes.BUTTONS_RESPONSE) {
-                        Debug.log(Debug.DEBUG, "Buttons response received");
-
-                        // TODO: cleanup and merge with chat command handling
-
-                        // split message into command and parameter
-                        let command = message.body.toLowerCase().split(' ')[0];
-                        // Note that this is reversed because the buttons are used for toggling
-                        let param = message.body.toLowerCase().split(' ')[1] == "off"; // only true and false
-                        let commandResponse = "No response set";
-                        // process command
-                        switch (command) {
-                            case "forward":
-                                this.ForwarderState.forward = param;
-                                this.sendForwarderState("Ready");
-                                return;
-                                break;
-                            case "relay":
-                                this.ForwarderState.relay = param;
-                                this.sendForwarderState("Ready");
-                                return;
-                                break;
-                            case "test":
-                                this.ForwarderState.test = param;
-                                this.sendForwarderState("Ready");
-                                return;
-                                break;
-                            default:
-                                Debug.log(Debug.ERROR, `Button command '${message.body}' unknown`);
-                                commandResponse = `Button command '${message.body}' unknown`;
-                        }
-                    } else {
-                        Debug.log(Debug.ERROR, `Cannot process message of type '${message.type} from self'`);
-                    }
-                }
+        // Vcard version 3.0 syntax
+        // PROPERTY[;PARAMETER]:attribute[;attribute]
+        Debug.log(Debug.DEBUG, message.content);
+        let lines = message.content.split('\n');
+        let name = "Name not found";
+        let contactNumber = -1;
+        for (let line of lines) {
+            // split into property+param and attribute
+            let vcInfo = line.split(':');
+            // use formatted name as name 
+            if (vcInfo[0] == "FN") {
+                name = vcInfo[1];
             }
-        } catch (error) {
-            Debug.log(Debug.ERROR, "Problem in 'onMessage' -> error", error);
+
+            // split into property and param
+            let vcProperty = vcInfo[0].split(';');
+            // just use first phone number (for now)
+            if (vcProperty[0] == "item1.TEL") {
+                // remove + sign before, and space inbetween digits to convert to number
+                Debug.log(Debug.DEBUG, `TEL found, extra number from: ${vcInfo[1]}`);
+                contactNumber = parseInt(vcInfo[1].replace('+', '').replace(/\s/g, ''));
+            }
+        }
+        Debug.log(Debug.DEBUG, `Send vCard for ${name} (${contactNumber})`);
+        this.client.sendText(`${Config.remotePhoneNumber}@c.us`, `*vCard:* ${name}\n${contactNumber}@c.us`);
+    }
+
+    /**
+     * Process command (from remote phone)
+     * 
+     * @param command command to process 
+     * @param params optional parameters
+     * 
+     */
+    private async processCommand(command: string, ...params: string[]) {
+        // process command
+        switch (command) {
+            case "exit":
+                Debug.log(Debug.WARNING, "Exit script on user request")
+                // TODO: also send this message on user interrupt
+                await this.client.sendText(`${Config.remotePhoneNumber}@c.us`, "*Forwarder exited*");
+                process.exit(0);
+                break;
+            case "ping":
+                this.sendForwarderState("Still alive");
+                break;
+            case "forward":
+                this.ForwarderState.forward = params[0] == "on";
+                this.sendForwarderState("Ready");
+                break;
+            case "relay":
+                this.ForwarderState.relay = params[0] == "on";
+                this.sendForwarderState("Ready");
+                break;
+            case "test":
+                this.ForwarderState.test = params[0] == "on";
+                this.sendForwarderState("Ready");
+                break;
+            default:
+                Debug.log(Debug.ERROR, `Command '${command}' unknown`);
+                this.client.sendText(`${Config.remotePhoneNumber}@c.us`, `Command '${command}' unknown`);
         }
     }
 
+    /**
+     * Relay reply to original sender (text only)
+     *  
+     * @param message 
+     */
+    private relayTextMessage(message) {
+        Debug.log(Debug.DEBUG, "Received a reply to forwarded message => Relay message to original sender");
+
+        // extract sender from quote
+        let contactId = message.quotedMsg.body.split('\n')[1];
+        let contactNumber: number = parseInt(contactId.split('@')[0]);
+        let contactType = contactId.split('@')[1];
+
+        if (this.ForwarderState.relay) {
+            Debug.log(Debug.VERBOSE, `Relaying message to ${contactId}`);
+            // send message
+            if (contactType == "c.us") {
+                Debug.log(Debug.DEBUG, "Relay to CONTACT");
+                this.client.sendText(`${contactNumber}@c.us`, `${message.body}`);
+            } else {
+                Debug.log(Debug.DEBUG, "Relay to GROUP");
+                let groupAndContact = contactId.split('@')[0].split('-');
+                contactNumber = parseInt(groupAndContact[0]);
+                let groupNUmber: number = parseInt(groupAndContact[1])
+                this.client.sendText(`${contactNumber}-${groupNUmber}@g.us`, `${message.body}`);
+            }
+        } else {
+            Debug.log(Debug.VERBOSE, `Received relaying message for ${contactId}, but relaying is disabled`);
+        }
+    }
+
+    /**
+     * Process message from remote phone
+     * 
+     * @param message 
+     */
+    private async handleMessageFromRemotePhone(message) {
+
+        // process message from self
+        try {
+            switch (message.type) {
+                case MessageTypes.TEXT:
+                    // Received a reply to forwarderd message => Relay message to original sender
+                    if (message.quotedMsg != null) {
+                        this.relayTextMessage(message);
+                    } else {
+                        // split message into command and parameter
+                        let command = message.body.toLowerCase().split(' ')[0];
+                        let param: string = (message.body.toLowerCase().split(' ')[1] == "1") ? "on" : "off";
+                        this.processCommand(command, param);
+                    }
+                    break;
+                case MessageTypes.CONTACT_CARD:
+                    this.processVcard(message);
+                    break;
+                case MessageTypes.BUTTONS_RESPONSE:
+                    Debug.log(Debug.DEBUG, "Buttons response received");
+                    // split message into command and parameter
+                    let command = message.body.toLowerCase().split(' ')[0];
+                    // Note that this has to be reversed because the buttons are used for toggling
+                    let param = (message.body.toLowerCase().split(' ')[1] == "off") ? "on" : "off";
+                    // process command
+                    this.processCommand(command, param);
+                default:
+                    Debug.log(Debug.ERROR, `Cannot process message of type '${message.type} from self'`);
+            }
+        } catch (error) {
+            Debug.log(Debug.ERROR, "Problem in 'handleMessageFromRemotePhone' -> error", error);
+        }
+    }
+
+    /**
+     * Forward message to remote phone
+     * 
+     * @param message 
+     */
     private async handleForwardMessage(message) {
         let txtMessage = "";
         let senderMessage = "";
@@ -293,6 +305,11 @@ export class WAForwarder {
     }
 
 
+    /**
+     * Process incoming message
+     * 
+     * @param message 
+     */
     private async handleMessage(message) {
 
         Debug.log(Debug.VERBOSE, '--- Processing new message ---')
@@ -315,6 +332,9 @@ export class WAForwarder {
 
     }
 
+    /**
+     * Init forwarder
+     */
     private async init() {
         Debug.log(Debug.VERBOSE, `Initializing WA-forwarder for: ${Config.remotePhoneNumber}`)
         const me = await this.client.getMe();
