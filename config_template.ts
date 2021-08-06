@@ -11,6 +11,9 @@ export class Config {
     // phone number including country code (eg. 31 for NL), but without a +
     public static remotePhoneNumber: number = 31000000000;
 
+    // default forwarder state
+    public static ForwarderState = { "forward": false, "relay": false, "test": false }
+
     public static clientConfig = {
         sessionId: 'WA-forwarder',
         useChrome: true,

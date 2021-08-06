@@ -30,7 +30,7 @@ export class WAForwarder {
     // forward: forward incoming messages to remote phone
     // relay  : relay incoming messages from the remote phone to the original sender
     // test   : in test mode , messages from remote phone are also forwarded (back to remote phone)
-    private ForwarderState = { "forward": false, "relay": false, "test": false };
+    private ForwarderState;
 
     /**
      * 
@@ -42,6 +42,9 @@ export class WAForwarder {
 
         // save for internal use
         this.client = client;
+
+        // default forwarder state from config
+        this.ForwarderState = Config.ForwarderState;
 
         // init forwarder
         this.init();
